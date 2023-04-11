@@ -10,7 +10,7 @@ import pandas as pd
 import argparse
 
 # sys.path.append("/home/deepak/table_summary")
-from log_config import LOGGING_DEFAULT_CONFIG, configure_logger
+from table_summarizer.log_config import LOGGING_DEFAULT_CONFIG, configure_logger
 
 
 with open("config.yaml", "r") as f:
