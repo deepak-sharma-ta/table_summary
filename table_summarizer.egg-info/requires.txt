@@ -1,0 +1,8 @@
+argparse
+datasets
+evaluate
+pandas
+rouge_score
+
+[:python_version == "3.10.9"]
+importlib-metadata

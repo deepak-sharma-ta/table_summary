@@ -9,12 +9,12 @@ import subprocess
 import pandas as pd
 import argparse
 
-sys.path.append("/home/deepak/table_summary")
-from table_summarizer.log_config import LOGGING_DEFAULT_CONFIG, configure_logger
+# sys.path.append("/home/deepak/table_summary")
+from log_config import LOGGING_DEFAULT_CONFIG, configure_logger
 
 
-# with open("config.yaml", "r") as f:
-#     CONFIG = yaml.load(f, Loader=yaml.Loader)
+with open("config.yaml", "r") as f:
+    CONFIG = yaml.load(f, Loader=yaml.Loader)
 
 # DATA_PATH = CONFIG.get("DATA_PATH")
 # TRAIN_DATA = DATA_PATH.get("train_data")
@@ -40,14 +40,14 @@ parser.add_argument(
     help="add the path of log level",
 )
 
-args = parser.parse_args()
+# args = parser.parse_args()
 LOG_FILE = None
-if args.log_path:
-    LOG_FILE = args.log_path
+# if args.log_path:
+#     LOG_FILE = args.log_path
 
 CONSOLE_LOG = True
-if args.no_console_log:
-    CONSOLE_LOG = False
+# if args.no_console_log:
+#     CONSOLE_LOG = False
 
 
 class Summarizer:
@@ -74,7 +74,7 @@ class Summarizer:
         summary_type : str
             Type of summary input
         """
-        if summary_type != "text" or summary_type != "table":
+        if summary_type != "text" and summary_type != "table":
             raise TypeError(
                 "Please enter a value for summary type to be either text or table"
             )
@@ -99,15 +99,19 @@ class Summarizer:
         self.logger.warning("Logging - Start")
         self.logger.info("Loading the data...")
 
-        self.train_data = pd.read_csv(train_path)
-        self.logger.info(f"Train sample size: {self.train_data.shape[0]}")
+        self.train_data = train_path
+        self.logger.info(f"Train sample size: {pd.read_csv(self.train_data).shape[0]}")
 
         if val_path:
-            self.val_data = pd.read_csv(val_path)
-            self.logger.info(f"Validation sample size: {self.val_data.shape[0]}")
+            self.val_data = val_path
+            self.logger.info(
+                f"Validation sample size: {pd.read_csv(self.val_data).shape[0]}"
+            )
         if test_path:
-            self.test_data = pd.read_csv(test_path)
-            self.logger.info(f"Test sample size: {self.test_data.shape[0]}")
+            self.test_data = test_path
+            self.logger.info(
+                f"Test sample size: {pd.read_csv(self.test_data).shape[0]}"
+            )
 
     def train(self, output_dir):
         """
@@ -118,30 +122,51 @@ class Summarizer:
         output_dir : str
             Path to export the trained model
         """
+        model_name_or_path = CONFIG.get(self.summary_type.upper().get("MODEL_NAME"))
+
+        t5_params = [
+            "--source_prefix",
+            "summarize: ",
+        ]
+
+        model_params = [
+            "python",
+            "transformers/examples/pytorch/summarization/run_summarization.py",
+            "--model_name_or_path",
+            "t5-small",
+            "--do_train",
+            "--do_eval",
+            "--train_file",
+            self.train_data,
+            "--validation_file",
+            self.val_data,
+            "--text_column",
+            "text",
+            "--summary_column",
+            "summary",
+            "--overwrite_output_dir",
+            "--output_dir",
+            output_dir,
+            "--per_device_train_batch_size=4",
+            "--per_device_eval_batch_size=4",
+            "--predict_with_generate",
+            "--max_train_samples",
+            "100",  # optional
+            "--max_predict_samples",
+            "50",  # optional
+        ]
+
+        if model_name_or_path == "t5-small":
+            model_params += t5_params
+
         # Start the training
-        subprocess.run(
-            [
-                "python",
-                "transformers/examples/pytorch/summarization/run_summarization.py",
-                "--model_name_or_path t5-small",
-                "--do_train",
-                "--do_eval",
-                f"--train_file {self.train_data}",
-                f"--validation_file {self.val_data}",
-                '--text_column "text"',
-                '--summary_column "summary"',
-                '--source_prefix "summarize: "',
-                "--overwrite_output_dir",
-                f"--output_dir {output_dir}",
-                "--per_device_train_batch_size=4",
-                "--per_device_eval_batch_size=4",
-                "--predict_with_generate",
-                "--max_train_samples {100}",  # optional
-                "--max_predict_samples {50}",  # optional
-            ],
-            shell=True,
+        trainer = subprocess.run(
+            model_params,
+            # shell=True
             check=True,
+            capture_output=True,
         )
+        self.logger.info(f"Trainer output: \n\n{trainer.stdout}")
         self.logger.info("Training done...")
 
 
