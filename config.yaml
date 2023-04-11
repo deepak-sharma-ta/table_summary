@@ -1,0 +1,13 @@
+DATA_PATH:
+  train_data: "data/processed/train_data.csv"
+  val_data: "data/processed/val_data.csv"
+  test_data: "data/processed/dev.csv"
+  totto_target_summary: "data/processed/totto_cleaned_dev_data.jsonl"
+
+ARTIFACTS:
+  t5: "artifacts/t5-small/"
+
+GENERATED_PREDICTION:
+  generated_txt: "predictions/fine-tune/t5-small/generated_predictions.txt"
+
+OUTPUT_DIR: "predictions/fine-tune/t5-small/metrics/"

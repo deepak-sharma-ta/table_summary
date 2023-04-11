@@ -1,0 +1,15 @@
+2023-04-05 11:42:02,527 - root - WARNING - <module>:58 - Logging - Start
+2023-04-05 11:42:02,528 - root - INFO - <module>:59 - Loading the data...
+2023-04-05 11:42:02,992 - root - INFO - <module>:65 - Train sample size: 83527
+2023-04-05 11:42:02,992 - root - INFO - <module>:66 - Validation sample size: 20940
+2023-04-05 11:42:02,992 - root - INFO - <module>:67 - Test sample size: test_df.shape[0]
+2023-04-05 11:42:07,449 - root - WARNING - <module>:58 - Logging - Start
+2023-04-05 11:42:07,449 - root - INFO - <module>:59 - Loading the data...
+2023-04-05 11:42:07,933 - root - INFO - <module>:65 - Train sample size: 83527
+2023-04-05 11:42:07,933 - root - INFO - <module>:66 - Validation sample size: 20940
+2023-04-05 11:42:07,933 - root - INFO - <module>:67 - Test sample size: test_df.shape[0]
+2023-04-05 11:42:26,907 - root - WARNING - <module>:58 - Logging - Start
+2023-04-05 11:42:26,907 - root - INFO - <module>:59 - Loading the data...
+2023-04-05 11:42:27,372 - root - INFO - <module>:65 - Train sample size: 83527
+2023-04-05 11:42:27,372 - root - INFO - <module>:66 - Validation sample size: 20940
+2023-04-05 11:42:27,372 - root - INFO - <module>:67 - Test sample size: 5336
