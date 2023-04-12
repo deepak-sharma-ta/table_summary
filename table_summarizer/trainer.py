@@ -16,38 +16,15 @@ from table_summarizer.log_config import LOGGING_DEFAULT_CONFIG, configure_logger
 with open("config.yaml", "r") as f:
     CONFIG = yaml.load(f, Loader=yaml.Loader)
 
-# DATA_PATH = CONFIG.get("DATA_PATH")
-# TRAIN_DATA = DATA_PATH.get("train_data")
-# TEST_DATA = DATA_PATH.get("test_data")
-# VAL_DATA = DATA_PATH.get("val_data")
-# TARGET_DATA = DATA_PATH.get("totto_target_summary")
-# ARTIFACTS = DATA_PATH.get("ARTIFACTS")
-# GENERATED_PREDICTION = DATA_PATH.get("GENERATED_PREDICTION")
+DATA_PATH = CONFIG.get("DATA_PATH")
+TRAIN = DATA_PATH.get("train_data")
+VAL = DATA_PATH.get("val_data")
+TEST = DATA_PATH.get("test_data")
+OUTPUT_DIR = CONFIG.get("MODEL").get("OUTPUT_DIR")
+GENERATED_PREDICTION = CONFIG.get("GENERATED_PREDICTION").get("generated_txt")
 
-
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--no-console-log",
-    action="store_true",
-    required=False,
-    help="add the path of log level",
-)
-parser.add_argument(
-    "-lp",
-    "--log-path",
-    type=str,
-    required=False,
-    help="add the path of log level",
-)
-
-# args = parser.parse_args()
 LOG_FILE = None
-# if args.log_path:
-#     LOG_FILE = args.log_path
-
 CONSOLE_LOG = True
-# if args.no_console_log:
-#     CONSOLE_LOG = False
 
 
 class Summarizer:
@@ -64,6 +41,10 @@ class Summarizer:
         self.train_data = None
         self.val_data = None
         self.test_data = None
+        self.t5_params = [
+            "--source_prefix",
+            "summarize: ",
+        ]
 
     def get_summarizer(self, summary_type: str = None):
         """
@@ -81,7 +62,9 @@ class Summarizer:
         else:
             self.summary_type = summary_type
 
-    def load_data(self, train_path: str, test_path: str = None, val_path: str = None):
+    def load_data(
+        self, train_path: str = TRAIN, test_path: str = TEST, val_path: str = VAL
+    ):
         """
         Initialize the sumamrizer with type of summary expected
 
@@ -113,7 +96,7 @@ class Summarizer:
                 f"Test sample size: {pd.read_csv(self.test_data).shape[0]}"
             )
 
-    def train(self, output_dir):
+    def train(self, output_dir=OUTPUT_DIR):
         """
         Initialize the sumamrizer with type of summary expected
 
@@ -122,18 +105,15 @@ class Summarizer:
         output_dir : str
             Path to export the trained model
         """
-        model_name_or_path = CONFIG.get(self.summary_type.upper().get("MODEL_NAME"))
-
-        t5_params = [
-            "--source_prefix",
-            "summarize: ",
-        ]
+        model_name_or_path = CONFIG.get(
+            self.summary_type.upper().get("MODEL_NAME")
+        )  # get the model type
 
         model_params = [
             "python",
             "transformers/examples/pytorch/summarization/run_summarization.py",
             "--model_name_or_path",
-            "t5-small",
+            model_name_or_path,
             "--do_train",
             "--do_eval",
             "--train_file",
@@ -144,7 +124,7 @@ class Summarizer:
             "text",
             "--summary_column",
             "summary",
-            "--overwrite_output_dir",
+            "--overwrite_output_dir",  # to overwrite the existing files
             "--output_dir",
             output_dir,
             "--per_device_train_batch_size=4",
@@ -157,7 +137,7 @@ class Summarizer:
         ]
 
         if model_name_or_path == "t5-small":
-            model_params += t5_params
+            model_params += self.t5_params
 
         # Start the training
         trainer = subprocess.run(
@@ -169,46 +149,38 @@ class Summarizer:
         self.logger.info(f"Trainer output: \n\n{trainer.stdout}")
         self.logger.info("Training done...")
 
+    def predict(self, output_dir: str):
+        model_name_or_path = CONFIG.get("MODEL").get("MODEL_PATH")  # get the model path
+        model_params = [
+            "python",
+            "transformers/examples/pytorch/summarization/run_summarization.py",
+            "--model_name_or_path",
+            model_name_or_path,
+            "--do_predict",
+            "--do_eval",
+            "--test_file",
+            self.test_data,
+            "--validation_file",
+            self.val_data,
+            "--text_column",
+            "text",
+            "--overwrite_output_dir",  # to overwrite the existing files
+            "--output_dir",
+            output_dir,
+            "--per_device_train_batch_size=4",
+            "--per_device_eval_batch_size=4",
+            "--predict_with_generate",
+        ]
 
-# # after execution of the above code
-# # output generated_predictions.txt will be stored in predictions/fine-tune/facebook-bart/
+        if model_name_or_path == "t5-small":
+            model_params += self.t5_params
 
-# # Cloning the language repo
-# subprocess.run(
-#     [
-#         "git",
-#         "clone",
-#         "https://github.com/google-research/language.git",
-#         "language_repo",
-#     ],
-#     shell=True,
-#     check=True,
-# )
-# logger.info("Cloned language repo...")
-
-# # Installing the requirements for language repo
-# subprocess.run(
-#     [
-#         "pip3",
-#         "install",
-#         "-r",
-#         "language_repo/language/totto/eval_requirements.txt",
-#         "language_repo",
-#     ],
-#     shell=True,
-#     check=True,
-# )
-# logger.info("Installed language repo requirements...")
-
-# # Making predictions
-# subprocess.run(
-#     [
-#         "bash",
-#         "language_repo/language/totto/totto_eval.sh",
-#         f"--prediction_path {GENERATED_PREDICTION.get('generated_txt')}",
-#         f"--target_path {TARGET_DATA}",
-#         f"--output_dir {CONFIG.get('OUTPUT_DIR')}",
-#     ],
-#     shell=True,
-#     check=True,
-# )
+        # Start the training
+        evaluator = subprocess.run(
+            model_params,
+            # shell=True
+            check=True,
+            capture_output=True,
+        )
+        self.logger.info(f"Evaluation output: \n\n{evaluator.stdout}")
+        self.logger.info("Evaluation done...")
