@@ -13,4 +13,4 @@ MODEL:
     MODEL_NAME: "facebook/bart-large-cnn"
   TABLE:
     MODEL_NAME: "t5-small"
-  MODEL_PATH: "artifacts/t5-small/"
+  FINETUNE_MODEL: "artifacts/t5-small/"

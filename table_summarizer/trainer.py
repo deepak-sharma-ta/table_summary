@@ -8,6 +8,7 @@ import yaml
 import subprocess
 import pandas as pd
 import argparse
+from transformers import pipeline
 
 # sys.path.append("/home/deepak/table_summary")
 from table_summarizer.log_config import LOGGING_DEFAULT_CONFIG, configure_logger
@@ -60,7 +61,7 @@ class Summarizer:
                 "Please enter a value for summary type to be either text or table"
             )
         else:
-            self.summary_type = summary_type
+            self.summary_type = summary_type.lower()
 
     def load_data(
         self, train_path: str = TRAIN, test_path: str = TEST, val_path: str = VAL
@@ -105,8 +106,8 @@ class Summarizer:
         output_dir : str
             Path to export the trained model
         """
-        model_name_or_path = CONFIG.get(
-            self.summary_type.upper().get("MODEL_NAME")
+        model_name_or_path = (
+            CONFIG.get("MODEL").get(self.summary_type.upper()).get("MODEL_NAME")
         )  # get the model type
 
         model_params = [
@@ -149,19 +150,40 @@ class Summarizer:
         self.logger.info(f"Trainer output: \n\n{trainer.stdout}")
         self.logger.info("Training done...")
 
-    def predict(self, output_dir: str):
-        model_name_or_path = CONFIG.get("MODEL").get("MODEL_PATH")  # get the model path
+    def predict(
+        self,
+        output_dir: str,
+        context: str = None,
+        test_data: str = None,
+        val_data: str = None,
+    ):
+        # getting the model name
+        model_name_or_path = CONFIG.get("MODEL").get("FINETUNE_MODEL")
+        if self.summary_type == "text":
+            if not context:
+                raise TypeError("Please enter a valid context")
+            summarizer = pipeline("summarization", model=model_name_or_path)
+            generated_sum = summarizer(str(context))[0]["summary_text"]
+
+            self.logger.info(f"Summary generated output: \n\n{generated_sum}")
+            self.logger.info("Generation done...")
+
+            return generated_sum
+
+        if not test_data:
+            test_data = self.test_data
+        if not val_data:
+            val_data = self.val_data
+
+        if not test_data and not val_data:
+            raise TypeError("Please enter a valid path for test and validation data")
+
+        # get the model path
         model_params = [
             "python",
             "transformers/examples/pytorch/summarization/run_summarization.py",
             "--model_name_or_path",
             model_name_or_path,
-            "--do_predict",
-            "--do_eval",
-            "--test_file",
-            self.test_data,
-            "--validation_file",
-            self.val_data,
             "--text_column",
             "text",
             "--overwrite_output_dir",  # to overwrite the existing files
@@ -169,10 +191,28 @@ class Summarizer:
             output_dir,
             "--per_device_train_batch_size=4",
             "--per_device_eval_batch_size=4",
+        ]
+        # command line argument for predict
+        predict_cli = [
+            "--do_predict",
+            "--test_file",
+            test_data,
             "--predict_with_generate",
         ]
+        # command line argument for validation
+        validation_cli = [
+            "--do_eval",
+            "--validation_file",
+            val_data,
+        ]
 
-        if model_name_or_path == "t5-small":
+        if test_data:  # if test data path is given
+            model_params += predict_cli
+
+        if val_data:  # if test val path is given
+            model_params += validation_cli
+
+        if model_name_or_path == "t5-small":  # if model name is t5 small
             model_params += self.t5_params
 
         # Start the training
