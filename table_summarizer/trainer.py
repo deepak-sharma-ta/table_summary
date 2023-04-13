@@ -3,14 +3,11 @@
 """
 
 import os
-import sys
-import yaml
 import subprocess
+import yaml
 import pandas as pd
-import argparse
 from transformers import pipeline
 
-# sys.path.append("/home/deepak/table_summary")
 from table_summarizer.log_config import LOGGING_DEFAULT_CONFIG, configure_logger
 
 
@@ -21,8 +18,10 @@ DATA_PATH = CONFIG.get("DATA_PATH")
 TRAIN = DATA_PATH.get("train_data")
 VAL = DATA_PATH.get("val_data")
 TEST = DATA_PATH.get("test_data")
+
 OUTPUT_DIR = CONFIG.get("MODEL").get("OUTPUT_DIR")
-GENERATED_PREDICTION = CONFIG.get("GENERATED_PREDICTION").get("generated_txt")
+MODEL_OUTPUT = OUTPUT_DIR.get("MODEL_ARTIFACTS")
+
 
 LOG_FILE = None
 CONSOLE_LOG = True
@@ -106,8 +105,8 @@ class Summarizer:
         output_dir : str
             Path to export the trained model
         """
-        model_name_or_path = (
-            CONFIG.get("MODEL").get(self.summary_type.upper()).get("MODEL_NAME")
+        model_name_or_path = CONFIG.get("MODEL").get(
+            "PRETRAINED_MODEL"
         )  # get the model type
 
         model_params = [
@@ -150,15 +149,27 @@ class Summarizer:
         self.logger.info(f"Trainer output: \n\n{trainer.stdout}")
         self.logger.info("Training done...")
 
+        self.predict(
+            model_name_or_path=output_dir,
+            output_dir=CONFIG.get("MODEL_PREDICTION").get("PATH"),
+            test_data=self.train_data,
+        )  # to save prediction on train data
+
     def predict(
         self,
-        output_dir: str,
+        model_name_or_path: str = None,
+        output_dir: str = None,
         context: str = None,
         test_data: str = None,
         val_data: str = None,
     ):
-        # getting the model name
-        model_name_or_path = CONFIG.get("MODEL").get("FINETUNE_MODEL")
+        # getting the model path
+        if not model_name_or_path:
+            model_name_or_path = CONFIG.get("MODEL").get("FINETUNED_MODEL")
+
+        if not output_dir:
+            output_dir = CONFIG.get("MODEL_PREDICTION").get("PATH")
+
         if self.summary_type == "text":
             if not context:
                 raise TypeError("Please enter a valid context")
