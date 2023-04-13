@@ -8,8 +8,8 @@ import yaml
 import pandas as pd
 from transformers import pipeline
 
-from table_summarizer.log_config import LOGGING_DEFAULT_CONFIG, configure_logger
-
+from table_summary.log_config import LOGGING_DEFAULT_CONFIG, configure_logger
+from table_summary.utils import generate_columns, generate_jsonl
 
 with open("config.yaml", "r") as f:
     CONFIG = yaml.load(f, Loader=yaml.Loader)
@@ -20,7 +20,8 @@ VAL = DATA_PATH.get("val_data")
 TEST = DATA_PATH.get("test_data")
 
 OUTPUT_DIR = CONFIG.get("MODEL").get("OUTPUT_DIR")
-MODEL_OUTPUT = OUTPUT_DIR.get("MODEL_ARTIFACTS")
+
+MODEL_PREDICTION = CONFIG.get("MODEL_PREDICTION").get("PATH")
 
 
 LOG_FILE = None
@@ -46,7 +47,7 @@ class Summarizer:
             "summarize: ",
         ]
 
-    def get_summarizer(self, summary_type: str = None):
+    def get_summarizer(self, summary_type: str = CONFIG.get("MODEL").get("INPUT_TYPE")):
         """
         Initialize the sumamrizer with type of summary expected
 
@@ -149,11 +150,26 @@ class Summarizer:
         self.logger.info(f"Trainer output: \n\n{trainer.stdout}")
         self.logger.info("Training done...")
 
-        self.predict(
-            model_name_or_path=output_dir,
-            output_dir=CONFIG.get("MODEL_PREDICTION").get("PATH"),
-            test_data=self.train_data,
-        )  # to save prediction on train data
+        if self.summary_type == "table":
+            self.predict(
+                model_name_or_path=output_dir,
+                output_dir=MODEL_PREDICTION,
+                test_data=self.train_data,
+                is_train=True,
+            )
+        else:
+            self.predict(
+                model_name_or_path=output_dir,
+                output_dir=MODEL_PREDICTION,
+                context=self.train_data,
+                is_train=True,
+            )
+
+        generate_jsonl(
+            self.train_data, MODEL_PREDICTION, output_dir, self.summary_type, "train"
+        )
+
+        self.logger.info("Summary generated training data")
 
     def predict(
         self,
@@ -162,76 +178,123 @@ class Summarizer:
         context: str = None,
         test_data: str = None,
         val_data: str = None,
+        is_train=False,
     ):
         # getting the model path
         if not model_name_or_path:
             model_name_or_path = CONFIG.get("MODEL").get("FINETUNED_MODEL")
 
         if not output_dir:
-            output_dir = CONFIG.get("MODEL_PREDICTION").get("PATH")
+            output_dir = MODEL_PREDICTION
 
         if self.summary_type == "text":
             if not context:
                 raise TypeError("Please enter a valid context")
             summarizer = pipeline("summarization", model=model_name_or_path)
-            generated_sum = summarizer(str(context))[0]["summary_text"]
 
+            if isinstance(context, str):
+                generated_sum = summarizer(str(context))[0]["summary_text"]
+                df = pd.DataFrame([generated_sum], columns=["predicted_summary"])
+                df["context"] = context
+
+            elif (
+                isinstance(context, list)
+                | isinstance(context, pd.Series)
+                | isinstance(context, pd.DataFrame)
+            ):
+                generated_sum = []
+                contexts = []
+                for c in context:
+                    generated_sum.append(summarizer(str(c))[0]["summary_text"])
+                    contexts.append(c)
+
+                df = pd.DataFrame(generated_sum, columns=["predicted_summary"])
+                df["context"] = contexts
+
+            df = generate_columns(
+                df,
+                model_name=model_name_or_path,
+                input_type=self.summary_type,
+                data_type="test",
+            )
+            df = df[
+                [
+                    "context",
+                    "predicted_summary",
+                    "model_name",
+                    "input_type",
+                    "data_type",
+                ]
+            ]
+            out = model_name_or_path.replace("/", "_")
+            if not out.endswith("_"):
+                out += "_"
+
+            df.to_json(
+                os.path.join(output_dir, f"{out}prediction.jsonl"),
+                orient="records",
+            )
             self.logger.info(f"Summary generated output: \n\n{generated_sum}")
-            self.logger.info("Generation done...")
+            self.logger.info(f"\nInference done for model: \n\n{model_name_or_path}")
 
-            return generated_sum
+        else:
+            if not test_data:
+                test_data = self.test_data
+            if not val_data:
+                val_data = self.val_data
 
-        if not test_data:
-            test_data = self.test_data
-        if not val_data:
-            val_data = self.val_data
+            if not test_data and not val_data:
+                raise TypeError(
+                    "Please enter a valid path for test and validation data"
+                )
 
-        if not test_data and not val_data:
-            raise TypeError("Please enter a valid path for test and validation data")
+            # get the model path
+            model_params = [
+                "python",
+                "transformers/examples/pytorch/summarization/run_summarization.py",
+                "--model_name_or_path",
+                model_name_or_path,
+                "--text_column",
+                "text",
+                "--overwrite_output_dir",  # to overwrite the existing files
+                "--output_dir",
+                output_dir,
+                "--per_device_train_batch_size=4",
+                "--per_device_eval_batch_size=4",
+            ]
+            # command line argument for predict
+            predict_cli = [
+                "--do_predict",
+                "--test_file",
+                test_data,
+                "--predict_with_generate",
+            ]
+            # command line argument for validation
+            validation_cli = [
+                "--do_eval",
+                "--validation_file",
+                val_data,
+            ]
 
-        # get the model path
-        model_params = [
-            "python",
-            "transformers/examples/pytorch/summarization/run_summarization.py",
-            "--model_name_or_path",
-            model_name_or_path,
-            "--text_column",
-            "text",
-            "--overwrite_output_dir",  # to overwrite the existing files
-            "--output_dir",
-            output_dir,
-            "--per_device_train_batch_size=4",
-            "--per_device_eval_batch_size=4",
-        ]
-        # command line argument for predict
-        predict_cli = [
-            "--do_predict",
-            "--test_file",
-            test_data,
-            "--predict_with_generate",
-        ]
-        # command line argument for validation
-        validation_cli = [
-            "--do_eval",
-            "--validation_file",
-            val_data,
-        ]
+            if test_data:  # if test data path is given
+                model_params += predict_cli
 
-        if test_data:  # if test data path is given
-            model_params += predict_cli
+            if val_data:  # if test val path is given
+                model_params += validation_cli
 
-        if val_data:  # if test val path is given
-            model_params += validation_cli
+            if model_name_or_path == "t5-small":  # if model name is t5 small
+                model_params += self.t5_params
 
-        if model_name_or_path == "t5-small":  # if model name is t5 small
-            model_params += self.t5_params
+            # Start the training
+            evaluator = subprocess.run(
+                model_params,
+                # shell=True
+                check=True,
+                capture_output=True,
+            )
+            generate_jsonl(
+                test_data, output_dir, model_name_or_path, self.summary_type, "test"
+            )
 
-        # Start the training
-        evaluator = subprocess.run(
-            model_params,
-            # shell=True
-            check=True,
-            capture_output=True,
-        )
         self.logger.info(f"Evaluation output: \n\n{evaluator.stdout}")
         self.logger.info("Evaluation done...")
