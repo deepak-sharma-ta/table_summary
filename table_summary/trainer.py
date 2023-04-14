@@ -140,6 +140,7 @@ class Summarizer:
         if model_name_or_path == "t5-small":
             model_params += self.t5_params
 
+        self.logger.info("Trainer started...")
         # Start the training
         trainer = subprocess.run(
             model_params,
@@ -165,11 +166,7 @@ class Summarizer:
                 is_train=True,
             )
 
-        generate_jsonl(
-            self.train_data, MODEL_PREDICTION, output_dir, self.summary_type, "train"
-        )
-
-        self.logger.info("Summary generated training data")
+        self.logger.info("Summary generated for training data")
 
     def predict(
         self,
@@ -211,21 +208,35 @@ class Summarizer:
                 df = pd.DataFrame(generated_sum, columns=["predicted_summary"])
                 df["context"] = contexts
 
-            df = generate_columns(
-                df,
-                model_name=model_name_or_path,
-                input_type=self.summary_type,
-                data_type="test",
-            )
-            df = df[
-                [
-                    "context",
-                    "predicted_summary",
-                    "model_name",
-                    "input_type",
-                    "data_type",
-                ]
-            ]
+                df = generate_columns(
+                    df,
+                    model_name=model_name_or_path,
+                    input_type=self.summary_type,
+                    data_type="train" if is_train else "test",
+                )
+
+                # re-arranging the columns
+                column_order = (
+                    [
+                        "context",
+                        "predicted_summary",
+                        "model_name",
+                        "input_type",
+                        "data_type",
+                    ]
+                    if self.summary_type == "text"
+                    else [
+                        "context",
+                        "actual_summary",
+                        "predicted_summary",
+                        "model_name",
+                        "input_type",
+                        "data_type",
+                    ]
+                )
+
+                df = df[column_order]
+
             out = model_name_or_path.replace("/", "_")
             if not out.endswith("_"):
                 out += "_"
@@ -293,7 +304,11 @@ class Summarizer:
                 capture_output=True,
             )
             generate_jsonl(
-                test_data, output_dir, model_name_or_path, self.summary_type, "test"
+                test_data,
+                output_dir,
+                model_name_or_path,
+                self.summary_type,
+                "train" if is_train else "test",
             )
 
         self.logger.info(f"Evaluation output: \n\n{evaluator.stdout}")

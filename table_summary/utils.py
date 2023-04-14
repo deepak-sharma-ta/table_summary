@@ -22,7 +22,9 @@ def generate_columns(
 
 def generate_jsonl(data, prediction_path, model_name, summary_type, data_type):
     train_df = pd.read_csv(data)
-    train_df.columns = ["context", "actual_summary"]
+    train_df.columns = (
+        ["context", "actual_summary"] if data_type == "train" else ["context"]
+    )
 
     pred_sum = open(
         os.path.join(prediction_path, "generated_predictions.txt"), "r"
