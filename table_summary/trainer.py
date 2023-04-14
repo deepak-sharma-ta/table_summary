@@ -208,34 +208,23 @@ class Summarizer:
                 df = pd.DataFrame(generated_sum, columns=["predicted_summary"])
                 df["context"] = contexts
 
-                df = generate_columns(
-                    df,
-                    model_name=model_name_or_path,
-                    input_type=self.summary_type,
-                    data_type="train" if is_train else "test",
-                )
+            df = generate_columns(
+                df,
+                model_name=model_name_or_path,
+                input_type=self.summary_type,
+                data_type="train" if is_train else "test",
+            )
 
-                # re-arranging the columns
-                column_order = (
-                    [
-                        "context",
-                        "predicted_summary",
-                        "model_name",
-                        "input_type",
-                        "data_type",
-                    ]
-                    if self.summary_type == "text"
-                    else [
-                        "context",
-                        "actual_summary",
-                        "predicted_summary",
-                        "model_name",
-                        "input_type",
-                        "data_type",
-                    ]
-                )
+            # re-arranging the columns
+            column_order = [
+                "context",
+                "predicted_summary",
+                "model_name",
+                "input_type",
+                "data_type",
+            ]
 
-                df = df[column_order]
+            df = df[column_order]
 
             out = model_name_or_path.replace("/", "_")
             if not out.endswith("_"):
