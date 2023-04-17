@@ -6,15 +6,23 @@ import os
 import subprocess
 import yaml
 import pandas as pd
+import itertools
+import glob
+import json
+import os
+import subprocess
+import yaml
 from transformers import pipeline
 
 from table_summary.log_config import LOGGING_DEFAULT_CONFIG, configure_logger
-from table_summary.utils import generate_columns, generate_jsonl
+from table_summary.utils import generate_columns, generate_jsonl, create_table
 
 with open("config.yaml", "r") as f:
     CONFIG = yaml.load(f, Loader=yaml.Loader)
 
 DATA_PATH = CONFIG.get("DATA_PATH")
+raw_data = DATA_PATH.get("raw_data")
+processed_data = DATA_PATH.get("processed_data")
 TRAIN = DATA_PATH.get("train_data")
 VAL = DATA_PATH.get("val_data")
 TEST = DATA_PATH.get("test_data")
@@ -46,6 +54,93 @@ class Summarizer:
             "--source_prefix",
             "summarize: ",
         ]
+
+    def pre_process(self, data=CONFIG.get("folder_name")):
+        random_num = 111234
+        folder_list = glob.glob(os.path.join(raw_data, f"{data}/*"))
+        json_file = []
+        for folder in folder_list:
+            file_list = glob.glob(folder + "/*.csv")  # ext placeholder
+            if file_list:
+                for file in file_list:
+                    # input_df = pd.DataFrame()
+                    temp_json = {}
+                    df = pd.read_csv(file)
+                    # if df.shape[0] > 100:
+                    #     continue
+                    df.columns = [column.replace("_", " ") for column in df.columns]
+
+                    parent_list = create_table(df)  # list of dict
+                    highlighted_cell = list(
+                        itertools.product(range(1, df.shape[0] + 1), range(df.shape[1]))
+                    )
+                    highlighted_cells = [list(i) for i in highlighted_cell]
+
+                    temp_json["table"] = parent_list
+                    temp_json["table_webpage_url"] = ""
+                    temp_json["table_page_title"] = ""
+                    temp_json["table_section_title"] = ""
+                    temp_json["table_section_text"] = ""
+                    temp_json["highlighted_cells"] = highlighted_cells
+                    temp_json["example_id"] = int(random_num)
+                    temp_json["sentence_annotations"] = [
+                        {
+                            "original_sentence": "",
+                            "sentence_after_deletion": "",
+                            "sentence_after_ambiguity": "",
+                            "final_sentence": "test",
+                        }
+                    ]
+
+                    random_num += 1
+                    json_file.append(temp_json)
+
+        with open(os.path.join(processed_data, "unseen_data.jsonl"), "w") as outfile:
+            for entry in json_file:
+                json.dump(entry, outfile)
+                outfile.write("\n")
+
+        subprocess.run(
+            ["git", "clone", "https://github.com/luka-group/Lattice.git"], check=True
+        )
+        subprocess.run(["pip", "install", "-r", "Lattice/requirements.txt"], check=True)
+
+        process_params = [
+            "python",
+            "Lattice/preprocess/preprocess_data.py ",
+            "--input_path",
+            os.path.join(processed_data, "unseen_data.jsonl"),
+            "--output_path",
+            os.path.join(processed_data, "data_linearized.jsonl"),
+        ]
+
+        subprocess.run(
+            process_params,
+            check=True,
+            capture_output=True,
+        )
+
+        lattice_output = pd.read_json(
+            os.path.join(processed_data, "data_linearized.jsonl"), lines=True
+        )  # jsonl is the output from lattice step 1
+
+        model_input = pd.DataFrame()
+        if "sentence_annotations" in lattice_output.columns:
+            model_input["text"] = lattice_output["subtable_metadata_str"]
+            model_input["summary"] = (
+                lattice_output["sentence_annotations"]
+                .apply(lambda x: x[0]["final_sentence"])
+                .values
+            )
+        else:
+            model_input["context"] = lattice_output["subtable_metadata_str"]
+            model_input["summary"] = " "
+
+        model_input.to_json(
+            os.path.join(processed_data, "input_data.json"),
+            orient="records",
+            lines=True,
+        )  # you can pass this input_data.json to the model
 
     def get_summarizer(self, summary_type: str = CONFIG.get("MODEL").get("INPUT_TYPE")):
         """

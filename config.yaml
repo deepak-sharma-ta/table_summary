@@ -1,4 +1,7 @@
 DATA_PATH:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  folder_name: "extracted_folders"
   train_data: "data/processed/train_data.csv"
   val_data: "data/processed/val_data.csv"
   test_data: "data/processed/dev.csv"
@@ -6,26 +9,9 @@ DATA_PATH:
 MODEL:
   PRETRAINED_MODEL: "facebook/bart-large-cnn"
   OUTPUT_DIR: "artifacts/t5-small/" # path to save model after training
-  # MODEL_ARTIFACTS: # path to the saved model eg., Fine-tuned model
   PREDICTIONS: # path to save model predictions
   INPUT_TYPE: "TABLE" # TEXT | TABLE
   FINETUNED_MODEL: "artifacts/t5-small/"
   
 MODEL_PREDICTION:
   PATH: "test_output"
-
-# #   {
-# # "context": "", "actual_summary": "", "prediction": "", "model_name": "", "INPUT_TYPE": "", "DATA_TYPE": ""
-# #   },
-
-# model output:
-# 1. summary file (metrics)
-# 2. jsonl
-
-# JSONL
-# context , actual_summary, predicted summary, 
-# input_type, model_name, DATA_TYPE
-
-# 1. train
-# 2. val
-# 3. test

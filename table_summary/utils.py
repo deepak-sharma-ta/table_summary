@@ -43,3 +43,38 @@ def generate_jsonl(data, prediction_path, model_name, summary_type, data_type):
         os.path.join(prediction_path, "generated_predictions.jsonl"),
         orient="records",
     )
+
+
+def create_table(data):
+    """
+    convert unput df into jsonl file"""
+    columns = list(data.columns)
+    child_list = []
+    for column in columns:
+        child_list.append(
+            {
+                "value": column,
+                "is_header": True,
+                "column_span": 1,
+                "row_span": 1,
+            }
+        )
+
+    # source & desn
+    def iterate(row):
+        output_list = []
+        for column in columns:
+            output_list.append(
+                {
+                    "value": str(row[column]),
+                    "is_header": False,
+                    "column_span": 1,
+                    "row_span": 1,
+                }
+            )
+        return output_list
+
+    new_list = data.apply(iterate, axis=1).tolist()
+    new_list.insert(0, child_list)
+
+    return new_list
