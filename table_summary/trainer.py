@@ -101,11 +101,17 @@ class Summarizer:
                 outfile.write("\n")
 
         subprocess.run(
-            ["git", "clone", "https://github.com/luka-group/Lattice.git"], check=True
+            ["git", "clone", "https://github.com/luka-group/Lattice.git"],
+            check=True,
+            capture_output=True,
         )
         self.logger.info("Cloned Lattice...")
 
-        subprocess.run(["pip", "install", "-r", "Lattice/requirements.txt"], check=True)
+        subprocess.run(
+            ["pip", "install", "-r", "Lattice/requirements.txt"],
+            check=True,
+            capture_output=True,
+        )
         self.logger.info("Installed the requirements for Lattice...")
 
         process_params = [
@@ -122,6 +128,7 @@ class Summarizer:
             check=True,
             capture_output=True,
         )
+        self.logger.info("Executed Lattice...")
 
         lattice_output = pd.read_json(
             os.path.join(processed_data, "data_linearized.jsonl"), lines=True
@@ -144,6 +151,7 @@ class Summarizer:
             orient="records",
             lines=True,
         )  # you can pass this input_data.json to the model
+        self.logger.info("Pre-processing done...")
 
     def get_summarizer(self, summary_type: str = CONFIG.get("MODEL").get("INPUT_TYPE")):
         """
