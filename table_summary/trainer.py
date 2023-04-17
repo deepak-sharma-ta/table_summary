@@ -23,6 +23,7 @@ with open("config.yaml", "r") as f:
 DATA_PATH = CONFIG.get("DATA_PATH")
 raw_data = DATA_PATH.get("raw_data")
 processed_data = DATA_PATH.get("processed_data")
+folder_name = DATA_PATH.get("folder_name")
 TRAIN = DATA_PATH.get("train_data")
 VAL = DATA_PATH.get("val_data")
 TEST = DATA_PATH.get("test_data")
@@ -55,15 +56,14 @@ class Summarizer:
             "summarize: ",
         ]
 
-    def pre_process(self, data=CONFIG.get("folder_name")):
+    def pre_process(self, data=raw_data):
         random_num = 111234
-        folder_list = glob.glob(os.path.join(raw_data, f"{data}/*"))
+        folder_list = glob.glob(os.path.join(data, f"{folder_name}/*"))
         json_file = []
         for folder in folder_list:
             file_list = glob.glob(folder + "/*.csv")  # ext placeholder
             if file_list:
                 for file in file_list:
-                    # input_df = pd.DataFrame()
                     temp_json = {}
                     df = pd.read_csv(file)
                     # if df.shape[0] > 100:
