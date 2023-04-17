@@ -407,5 +407,5 @@ class Summarizer:
                 "train" if is_train else "test",
             )
 
-        self.logger.info(f"Evaluation output: \n\n{evaluator.stdout}")
-        self.logger.info("Evaluation done...")
+            self.logger.info(f"Evaluation output: \n\n{evaluator.stdout}")
+            self.logger.info("Evaluation done...")
