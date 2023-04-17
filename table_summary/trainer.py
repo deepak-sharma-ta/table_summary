@@ -56,7 +56,7 @@ class Summarizer:
             "summarize: ",
         ]
 
-    def pre_process(self, data=raw_data):
+    def pre_process(self, data=raw_data, test=False):
         random_num = 111234
         folder_list = glob.glob(os.path.join(data, f"{folder_name}/*"))
         json_file = []
@@ -66,8 +66,9 @@ class Summarizer:
                 for file in file_list:
                     temp_json = {}
                     df = pd.read_csv(file)
-                    # if df.shape[0] > 100:
-                    #     continue
+                    if test:
+                        if df.shape[0] > 100:
+                            continue
                     df.columns = [column.replace("_", " ") for column in df.columns]
 
                     parent_list = create_table(df)  # list of dict
