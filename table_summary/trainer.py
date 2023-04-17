@@ -103,11 +103,14 @@ class Summarizer:
         subprocess.run(
             ["git", "clone", "https://github.com/luka-group/Lattice.git"], check=True
         )
+        self.logger.info("Cloned Lattice...")
+
         subprocess.run(["pip", "install", "-r", "Lattice/requirements.txt"], check=True)
+        self.logger.info("Installed the requirements for Lattice...")
 
         process_params = [
             "python",
-            "Lattice/preprocess/preprocess_data.py ",
+            "Lattice/preprocess/preprocess_data.py",
             "--input_path",
             os.path.join(processed_data, "unseen_data.jsonl"),
             "--output_path",
