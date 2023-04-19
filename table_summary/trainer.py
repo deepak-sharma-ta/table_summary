@@ -283,6 +283,7 @@ class Summarizer:
         test_data: str = None,
         val_data: str = None,
         is_train=False,
+        **kwargs
     ):
         # getting the model path
         if not model_name_or_path:
@@ -294,7 +295,7 @@ class Summarizer:
         if self.summary_type == "text":
             if not context:
                 raise TypeError("Please enter a valid context")
-            summarizer = pipeline("summarization", model=model_name_or_path)
+            summarizer = pipeline("summarization", model=model_name_or_path,**kwargs)
 
             if isinstance(context, str):
                 generated_sum = summarizer(str(context))[0]["summary_text"]
@@ -341,7 +342,7 @@ class Summarizer:
                 os.path.join(output_dir, f"{out}prediction.jsonl"),
                 orient="records",
             )
-            self.logger.info(f"Summary generated output: \n\n{generated_sum}")
+            self.logger.info(f"Summary generated output: \n\n{df}")
             self.logger.info(f"\nInference done for model: \n\n{model_name_or_path}")
 
         else:
